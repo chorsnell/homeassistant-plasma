@@ -16,6 +16,8 @@ from umqtt.simple import MQTTClient
 
 from strip_controller import StripController
 
+from pimoroni import RGBLED, Button
+
 try:
     import config_local as CONFIG
 except ImportError:
@@ -29,6 +31,34 @@ AVAILABILITY_TOPIC = f"{CONFIG.MQTT_DISCOVERY_PREFIX}/light/{CONFIG.MQTT_CLIENTI
 
 RECONNECT_DELAY = const(10)
 
+led = RGBLED("LED_R", "LED_G", "LED_B")
+
+# Brightness level (0.0 to 1.0, where 1.0 is full brightness)
+brightness = 0.2
+
+def set_led_brightness(level):
+    """
+    Set the brightness level for the LED.
+    Args:
+        level: Float between 0.0 (off) and 1.0 (full brightness)
+    """
+    global brightness
+    brightness = max(0.0, min(1.0, level))  # Clamp between 0.0 and 1.0
+
+def set_rgb_with_brightness(r, g, b):
+    """
+    Set RGB color with brightness applied.
+    Args:
+        r: Red value (0-255)
+        g: Green value (0-255)
+        b: Blue value (0-255)
+    """
+    r_scaled = int(r * brightness)
+    g_scaled = int(g * brightness)
+    b_scaled = int(b * brightness)
+    led.set_rgb(r_scaled, g_scaled, b_scaled)
+
+led.set_rgb(0, 0, 0)
 
 class HomeAssistantPlasmaStick:
     def __init__(self):
@@ -36,13 +66,15 @@ class HomeAssistantPlasmaStick:
         self.network_manager = NetworkManager(CONFIG.WIFI_COUNTRY, status_handler=self.wifi_status_handler, error_handler=self.wifi_error_handler, client_timeout=15)
         self.mqtt_client = None
 
-        self.pico_led = Pin('LED', Pin.OUT)  # set up the Pico W's onboard LED
-        self.pico_led.value(True)  # Turn on LED to indiciate initilization started
+        #self.pico_led = RGBLED("LED_R", "LED_G", "LED_B")
+        #set_rgb_with_brightness(0, 255, 0)  # Turn on LED to indiciate initilization started
+
+    
 
     async def wifi_status_handler(self, mode, status, ip):
         print('Attempting WiFi Connection')
         print(f"WiFi Status Handler: mode={mode}, status={status}, ip={ip}")
-        self.pico_led.value(True)
+        set_rgb_with_brightness(0, 255, 0)        
         await self.strip_controller.effects.status_effect(0, 0, 128)
         await asyncio.sleep(2)
 
@@ -52,11 +84,11 @@ class HomeAssistantPlasmaStick:
             await self.strip_controller.effects.status_effect(0, 0, 255)
             await asyncio.sleep_ms(500)
             await self.strip_controller.effects.status_effect(0, 0, 0)
-            self.pico_led.value(False)
+            set_rgb_with_brightness(0, 0, 0)
 
         elif status is False:
             print(f'Wifi not connected: {status}')
-            self.pico_led.value(True)
+            set_rgb_with_brightness(0, 255, 0)
             await self.strip_controller.effects.status_effect(64, 0, 0)
 
         else:
@@ -67,7 +99,7 @@ class HomeAssistantPlasmaStick:
 
     async def wifi_error_handler(self, mode, message):
         print(f"Wifi Error: {mode}: {message}")
-        self.pico_led.value(True)
+        set_rgb_with_brightness(0, 255, 0)
 
         await self.strip_controller.effects.status_effect(128, 0, 0)
         await asyncio.sleep(RECONNECT_DELAY)
@@ -77,7 +109,7 @@ class HomeAssistantPlasmaStick:
             await asyncio.sleep(RECONNECT_DELAY)
 
     async def mqtt_connect(self):
-        self.pico_led.value(True)
+        set_rgb_with_brightness(0, 255, 0)
         await self.strip_controller.effects.status_effect(0, 64, 0)
         while self.mqtt_client is None:
             print('MQTT: Init MQTT Client')
@@ -99,9 +131,9 @@ class HomeAssistantPlasmaStick:
 
                 for _ in range(5):
                     await asyncio.sleep_ms(100)
-                    self.pico_led.value(True)
+                    set_rgb_with_brightness(0, 255, 0)
                     await asyncio.sleep_ms(100)
-                    self.pico_led.value(False)
+                    set_rgb_with_brightness(0, 0, 0)
 
                 print('MQTT: Ready')
 
@@ -115,6 +147,7 @@ class HomeAssistantPlasmaStick:
                 await asyncio.sleep(10)
 
     def mqtt_broadcast_state(self):
+        set_rgb_with_brightness(0, 0, 255)
         print("MQTT: Update light state")
         print(f"MQTT Update: Effect: {self.strip_controller.effect}")
         if self.strip_controller.effect in self.strip_controller.effects.colour_effects:  # Effect supports colours - Static or Sparkles
@@ -138,6 +171,7 @@ class HomeAssistantPlasmaStick:
 
         print("MQTT State update: {}".format(state))
         self.mqtt_client.publish(STATE_TOPIC, json.dumps(state), qos=1)
+        set_rgb_with_brightness(0, 0, 0)
 
     def mqtt_callback(self, topic, msg):
         topic = topic.decode('utf-8')
@@ -280,3 +314,4 @@ class HomeAssistantPlasmaStick:
 if __name__ == '__main__':
     main = HomeAssistantPlasmaStick()
     asyncio.run(main.main())
+
