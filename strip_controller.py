@@ -11,7 +11,6 @@ from random import randrange, uniform
 import asyncio
 import gc
 import plasma
-from plasma import plasma_stick
 
 try:
     import config_local as CONFIG
@@ -38,7 +37,7 @@ class StripController:
         self.current_leds = [[0, 0, 0] for _ in range(self.num_leds)]
         self.target_leds = [[0, 0, 0] for _ in range(self.num_leds)]
 
-        self.led_strip = plasma.WS2812(CONFIG.NUM_LEDS, 0, 0, plasma_stick.DAT, color_order=plasma.COLOR_ORDER_RGB)
+        self.led_strip = plasma.WS2812(CONFIG.NUM_LEDS, rgbw=True)
         self.led_strip.start()
 
         self.effects = Effects(self.led_strip, CONFIG.NUM_LEDS, self.current_leds, self.target_leds)
@@ -55,7 +54,7 @@ class StripController:
     async def _display_current(num_leds, led_strip, current_leds):
         # paint our current LED colours to the strip_controller
         for i in range(num_leds):
-            led_strip.set_rgb(i, current_leds[i][0], current_leds[i][1], current_leds[i][2])
+            led_strip.set_rgb_with_brightness(i, current_leds[i][0], current_leds[i][1], current_leds[i][2])
 
     async def set_state(self, brightness=None, hue=None, saturation=None, state=None, effect=None):
         print(f"set_state: State: {state}, brightness: {brightness}, hue: {hue}, saturation: {saturation}, Effect: {effect}")
@@ -86,7 +85,7 @@ class StripController:
         print(f"set_state: New State: {state}, brightness: {brightness}, hue: {hue}, saturation: {saturation}, Effect: {effect}")
         self._update_strip()
 
-    def set_rgb(self, r, g, b):
+    def set_rgb_with_brightness(self, r, g, b):
         h, s, v = self.effects.rgb_to_hsv(r, g, b)
         self.set_state(hue=h, saturation=s, brightness=v, state=True)
 
